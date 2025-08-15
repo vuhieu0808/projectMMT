@@ -5,6 +5,7 @@
 #include "src/config.h"
 #include "src/email_utils.h"
 #include "src/email_function.h"
+#include "src/ServerManager.h" 
 
 #include <iostream>
 #include <string>
@@ -31,396 +32,11 @@ enum class ClientMode {
     EMAIL
 };
 
-enum class ConnectionStatus {
-    DISCONNECTED,
-    CONNECTING,
-    CONNECTED,
-    CONNECTION_FAILED
-};
-
-struct ServerInfo {
-    string name;
-    string ip;
-    int port;
-    
-    ServerInfo(const string& n, const string& i, int p) : name(n), ip(i), port(p) {}
-    
-    string toString() const {
-        return name + " (" + ip + ":" + to_string(port) + ")";
-    }
-    
-    string toFileString() const {
-        return name + "|" + ip + "|" + to_string(port);
-    }
-};
-
-// Global variables
+// Global variables - much simplified now
 atomic<bool> stopEmailMonitoring(false);
-vector<ServerInfo> serverList;
-int currentServerIndex = -1;
-SOCKET globalClientSocket = INVALID_SOCKET;
-ConnectionStatus connectionStatus = ConnectionStatus::DISCONNECTED;
-string connectionStatusMessage = "";
-const string SERVER_LIST_FILE = Config::BASE_DIR + "temp_client/servers.txt";
+ServerManager* serverManager = nullptr;  // Global instance of ServerManager
 
 bool processEmailCommand();
-
-// Connection status functions
-string getConnectionStatusString(ConnectionStatus status) {
-    switch (status) {
-        case ConnectionStatus::DISCONNECTED:
-            return "DISCONNECTED";
-        case ConnectionStatus::CONNECTING:
-            return "CONNECTING...";
-        case ConnectionStatus::CONNECTED:
-            return "CONNECTED";
-        case ConnectionStatus::CONNECTION_FAILED:
-            return "CONNECTION FAILED";
-        default:
-            return "UNKNOWN";
-    }
-}
-
-void setConnectionStatus(ConnectionStatus status, const string& message = "") {
-    connectionStatus = status;
-    connectionStatusMessage = message;
-    LogToFile("Connection status changed to: " + getConnectionStatusString(status) + 
-              (message.empty() ? "" : " - " + message));
-}
-
-void displayConnectionStatus() {
-    cout << "\n========== CONNECTION STATUS ==========\n";
-    if (currentServerIndex >= 0) {
-        cout << "Selected Server: " << serverList[currentServerIndex].toString() << endl;
-        cout << "Connection Status: " << getConnectionStatusString(connectionStatus);
-        if (!connectionStatusMessage.empty()) {
-            cout << " - " << connectionStatusMessage;
-        }
-        cout << endl;
-    } else {
-        cout << "Selected Server: None" << endl;
-        cout << "Connection Status: No server selected" << endl;
-    }
-    cout << "=====================================\n";
-}
-
-void saveServerList() {
-    ofstream file(SERVER_LIST_FILE);
-    if (file.is_open()) {
-        for (const auto& server : serverList) {
-            file << server.toFileString() << endl;
-        }
-        file.close();
-        LogToFile("Server list saved to " + SERVER_LIST_FILE);
-    } else {
-        LogToFile("Failed to save server list to " + SERVER_LIST_FILE);
-    }
-}
-
-// Server management functions
-void loadServerList() {
-    serverList.clear();
-    ifstream file(SERVER_LIST_FILE);
-    if (!file.is_open()) {
-        // Create default servers if file doesn't exist
-        serverList.push_back(ServerInfo("Local Server", "127.0.0.1", 12345));
-        saveServerList();
-        return;
-    }
-    
-    string line;
-    while (getline(file, line)) {
-        if (line.empty()) continue;
-        
-        size_t pos1 = line.find('|');
-        size_t pos2 = line.find('|', pos1 + 1);
-        
-        if (pos1 != string::npos && pos2 != string::npos) {
-            string name = line.substr(0, pos1);
-            string ip = line.substr(pos1 + 1, pos2 - pos1 - 1);
-            string portStr = line.substr(pos2 + 1);
-            
-            try {
-                int port = stoi(portStr);
-                serverList.push_back(ServerInfo(name, ip, port));
-            } catch (...) {
-                // Skip invalid lines
-            }
-        }
-    }
-    file.close();
-    
-    if (serverList.empty()) {
-        serverList.push_back(ServerInfo("Local Server", "127.0.0.1", 12345));
-    }
-}
-
-void displayServerList() {
-    cout << "\n========== SERVER LIST ==========\n";
-    if (serverList.empty()) {
-        cout << "No servers configured.\n";
-    } else {
-        for (size_t i = 0; i < serverList.size(); ++i) {
-            cout << (i + 1) << ". " << serverList[i].toString();
-            if (static_cast<int>(i) == currentServerIndex) {
-                cout << " [CURRENT]";
-            }
-            cout << endl;
-        }
-    }
-    cout << "================================\n";
-}
-
-void addServer() {
-    cout << "\n--- Add New Server ---\n";
-    cout << "Enter server name: ";
-    string name;
-    getline(cin, name);
-    
-    if (name.empty()) {
-        cout << "Server name cannot be empty." << endl;
-        return;
-    }
-    
-    cout << "Enter server IP: ";
-    string ip;
-    getline(cin, ip);
-    
-    if (ip.empty()) {
-        cout << "Server IP cannot be empty." << endl;
-        return;
-    }
-    
-    cout << "Enter server port: ";
-    string portStr;
-    getline(cin, portStr);
-    
-    try {
-        int port = stoi(portStr);
-        if (port <= 0 || port > 65535) {
-            cout << "Invalid port number. Must be between 1-65535." << endl;
-            return;
-        }
-        
-        serverList.push_back(ServerInfo(name, ip, port));
-        saveServerList();
-        cout << "Server added successfully: " << name << " (" << ip << ":" << port << ")" << endl;
-        LogToFile("Added server: " + name + " (" + ip + ":" + to_string(port) + ")");
-    } catch (...) {
-        cout << "Invalid port number." << endl;
-    }
-}
-
-void removeServer() {
-    if (serverList.empty()) {
-        cout << "No servers to remove." << endl;
-        return;
-    }
-    
-    displayServerList();
-    cout << "Enter server number to remove (1-" << serverList.size() << "): ";
-    string input;
-    getline(cin, input);
-    
-    try {
-        int index = stoi(input) - 1;
-        if (index < 0 || index >= static_cast<int>(serverList.size())) {
-            cout << "Invalid server number." << endl;
-            return;
-        }
-        
-        // Disconnect if removing current server
-        if (currentServerIndex == index && connectionStatus == ConnectionStatus::CONNECTED) {
-            if (globalClientSocket != INVALID_SOCKET) {
-                closesocket(globalClientSocket);
-                globalClientSocket = INVALID_SOCKET;
-            }
-            setConnectionStatus(ConnectionStatus::DISCONNECTED);
-            cout << "Disconnected from server (server being removed)." << endl;
-        }
-        
-        string removedServer = serverList[index].toString();
-        serverList.erase(serverList.begin() + index);
-        
-        // Adjust current server index
-        if (currentServerIndex == index) {
-            currentServerIndex = -1;
-        } else if (currentServerIndex > index) {
-            currentServerIndex--;
-        }
-        
-        saveServerList();
-        cout << "Server removed: " << removedServer << endl;
-        LogToFile("Removed server: " + removedServer);
-    } catch (...) {
-        cout << "Invalid input." << endl;
-    }
-}
-
-bool selectServer() {
-    if (serverList.empty()) {
-        cout << "No servers available. Please add a server first." << endl;
-        return false;
-    }
-    
-    displayServerList();
-    cout << "Enter server number to select (1-" << serverList.size() << "): ";
-    string input;
-    getline(cin, input);
-    
-    try {
-        int index = stoi(input) - 1;
-        if (index < 0 || index >= static_cast<int>(serverList.size())) {
-            cout << "Invalid server number." << endl;
-            return false;
-        }
-        
-        // Disconnect from current server if connected and switching to different server
-        if (connectionStatus == ConnectionStatus::CONNECTED && currentServerIndex != index) {
-            if (globalClientSocket != INVALID_SOCKET) {
-                closesocket(globalClientSocket);
-                globalClientSocket = INVALID_SOCKET;
-            }
-            setConnectionStatus(ConnectionStatus::DISCONNECTED, "Switched to different server");
-            cout << "Disconnected from previous server." << endl;
-        }
-        
-        currentServerIndex = index;
-        cout << "Selected server: " << serverList[currentServerIndex].toString() << endl;
-        LogToFile("Selected server: " + serverList[currentServerIndex].toString());
-        return true;
-    } catch (...) {
-        cout << "Invalid input." << endl;
-        return false;
-    }
-}
-
-bool connectToSelectedServer() {
-    if (currentServerIndex < 0) {
-        cout << "No server selected. Please select a server first." << endl;
-        return false;
-    }
-    
-    if (connectionStatus == ConnectionStatus::CONNECTED) {
-        cout << "Already connected to " << serverList[currentServerIndex].toString() << endl;
-        return true;
-    }
-    
-    const ServerInfo& server = serverList[currentServerIndex];
-    cout << "Connecting to " << server.toString() << "..." << endl;
-    setConnectionStatus(ConnectionStatus::CONNECTING);
-    
-    // Create socket
-    globalClientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (globalClientSocket == INVALID_SOCKET) {
-        string error = "Socket creation failed: " + to_string(WSAGetLastError());
-        cout << error << endl;
-        setConnectionStatus(ConnectionStatus::CONNECTION_FAILED, error);
-        return false;
-    }
-
-    // Server address
-    sockaddr_in serverAddr;
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(server.port);
-    if (inet_pton(AF_INET, server.ip.c_str(), &serverAddr.sin_addr) <= 0) {
-        string error = "Invalid server IP address: " + server.ip;
-        cout << error << endl;
-        setConnectionStatus(ConnectionStatus::CONNECTION_FAILED, error);
-        closesocket(globalClientSocket);
-        globalClientSocket = INVALID_SOCKET;
-        return false;
-    }
-
-    // Connect to server
-    if (connect(globalClientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        string error = "Connection failed: " + to_string(WSAGetLastError());
-        cout << error << endl;
-        setConnectionStatus(ConnectionStatus::CONNECTION_FAILED, error);
-        closesocket(globalClientSocket);
-        globalClientSocket = INVALID_SOCKET;
-        return false;
-    }
-
-    cout << "Successfully connected to " << server.toString() << endl;
-    setConnectionStatus(ConnectionStatus::CONNECTED, "Connection established");
-    return true;
-}
-
-bool disconnectFromServer() {
-    if (connectionStatus != ConnectionStatus::CONNECTED) {
-        cout << "Not connected to any server." << endl;
-        return false;
-    }
-    
-    if (globalClientSocket != INVALID_SOCKET) {
-        closesocket(globalClientSocket);
-        globalClientSocket = INVALID_SOCKET;
-    }
-    
-    cout << "Disconnected from server." << endl;
-    setConnectionStatus(ConnectionStatus::DISCONNECTED, "User disconnected");
-    return true;
-}
-
-void manageServers() {
-    while (true) {
-        system("cls");
-        cout << "\n========== SERVER MANAGEMENT ==========\n";
-        displayServerList();
-        displayConnectionStatus();
-        cout << "\n1. Add Server\n";
-        cout << "2. Remove Server\n";
-        cout << "3. Select Server\n";
-        cout << "4. Connect to Selected Server\n";
-        cout << "5. Disconnect from Server\n";
-        cout << "6. Back to Main Menu\n";
-        cout << "======================================\n";
-        cout << "Choose option: ";
-        
-        string input;
-        getline(cin, input);
-        
-        if (input.empty()) continue;
-        
-        int choice;
-        try {
-            choice = stoi(input);
-        } catch (...) {
-            cout << "Invalid option. Please try again." << endl;
-            cout << "\nPress Enter to continue...";
-            cin.get();
-            continue;
-        }
-        
-        switch (choice) {
-            case 1:
-                addServer();
-                break;
-            case 2:
-                removeServer();
-                break;
-            case 3:
-                selectServer();
-                break;
-            case 4:
-                connectToSelectedServer();
-                break;
-            case 5:
-                disconnectFromServer();
-                break;
-            case 6:
-                return;
-            default:
-                cout << "Invalid option. Please try again." << endl;
-        }
-        
-        if (choice != 6) {
-            cout << "\nPress Enter to continue...";
-            cin.get();
-        }
-    }
-}
 
 void displayMenu() {
     system("cls");
@@ -433,18 +49,13 @@ void displayMenu() {
     cout << "6. Exit\n";
     cout << "============================================\n";
     
-    // Display current connection info
-    if (currentServerIndex >= 0) {
-        cout << "Current Server: " << serverList[currentServerIndex].toString() << endl;
-        cout << "Status: " << getConnectionStatusString(connectionStatus);
-        if (!connectionStatusMessage.empty()) {
-            cout << " (" << connectionStatusMessage << ")";
-        }
-        cout << endl;
-    } else {
-        cout << "Current Server: None selected" << endl;
-        cout << "Status: No server selected" << endl;
+    // Display current connection info using ServerManager
+    cout << "Current Server: " << serverManager->getCurrentServerString() << endl;
+    cout << "Status: " << (serverManager->isConnected() ? "CONNECTED" : "DISCONNECTED");
+    if (!serverManager->getConnectionStatusMessage().empty()) {
+        cout << " (" << serverManager->getConnectionStatusMessage() << ")";
     }
+    cout << endl;
     cout << "Choose option: ";
 }
 
@@ -479,18 +90,6 @@ bool waitForInput(string& input, int timeoutSeconds) {
     return false; // Timeout, no input
 }
 
-void emailMonitoringWorker() {
-    while (!stopEmailMonitoring.load()) {
-        cout << "\n--- Checking for new emails ---" << endl;
-        processEmailCommand();
-        
-        // Wait 30 seconds but check for stop signal every second
-        for (int i = 0; i < 30 && !stopEmailMonitoring.load(); ++i) {
-            this_thread::sleep_for(chrono::seconds(1));
-        }
-    }
-}
-
 void displayCommandMenu() {
     system("cls");
     cout << "\n========== AVAILABLE COMMANDS ==========\n";
@@ -504,13 +103,14 @@ void displayCommandMenu() {
     cout << "8. getFile <filepath> - Download file from server\n";
     cout << "9. Start <service> - Start a service\n";
     cout << "10. Stop <service> - Stop a service\n";
-    cout << "11. Shutdown_Reset - Shutdown or reset server\n";
-    cout << "12. Custom command\n";
-    cout << "13. Back to main menu\n";
+    cout << "11. Shutdown - Shutdown server\n";
+    cout << "12. Reset - Reset server\n";
+    cout << "13. Custom command\n";
+    cout << "14. Back to main menu\n";
     cout << "=======================================\n";
     
-    // Show connection status
-    displayConnectionStatus();
+    // Show connection status using ServerManager
+    serverManager->displayConnectionStatus();
     cout << "Choose option: ";
 }
 
@@ -581,8 +181,10 @@ string getCommandInput(int choice) {
             getline(cin, parameter);
             return "Stop " + parameter;
         case 11:
-            return "Shutdown_Reset";
+            return "Shutdown_Reset shutdown";
         case 12:
+            return "Shutdown_Reset reset";
+        case 13:
             cout << "Enter custom command: ";
             getline(cin, command);
             return command;
@@ -707,6 +309,18 @@ bool processEmailCommand() {
     cout << "Email content read: IP:Port = " << ipPort << ", Command = " << command << ", From = " << fromEmail << endl;
     LogToFile("Email content read: IP:Port = " + ipPort + ", Command = " + command + ", From = " + fromEmail);
 
+    // Process shutdown/reset commands from email
+    string finalCommand = command;
+    if (command == "shutdown") {
+        finalCommand = "Shutdown_Reset shutdown";
+        cout << "Converted email command 'shutdown' to 'Shutdown_Reset shutdown'" << endl;
+        LogToFile("Converted email command 'shutdown' to 'Shutdown_Reset shutdown'");
+    } else if (command == "reset") {
+        finalCommand = "Shutdown_Reset reset";
+        cout << "Converted email command 'reset' to 'Shutdown_Reset reset'" << endl;
+        LogToFile("Converted email command 'reset' to 'Shutdown_Reset reset'");
+    }
+
     // Parse IP and port
     size_t colonPos = ipPort.find(':');
     if (colonPos == string::npos) {
@@ -729,7 +343,7 @@ bool processEmailCommand() {
     // Connect and process command
     SOCKET clientSocket;
     if (connectToServer(clientSocket, ip, port)) {
-        bool result = processCommand(clientSocket, command, fromEmail);
+        bool result = processCommand(clientSocket, finalCommand, fromEmail);
         closesocket(clientSocket);
         return result;
     }
@@ -758,17 +372,17 @@ void runConsoleMode() {
         
         switch (choice) {
             case 1: // Switch to email mode
-                if (connectionStatus == ConnectionStatus::CONNECTED) {
-                    disconnectFromServer();
+                if (serverManager->isConnected()) {
+                    serverManager->disconnectFromServer();
                 }
                 return; // Return to main to switch mode
                 
             case 2: // Manage servers
-                manageServers();
+                serverManager->manageServersMenu();
                 break;
                 
             case 3: { // Send command
-                if (connectionStatus != ConnectionStatus::CONNECTED) {
+                if (!serverManager->isConnected()) {
                     cout << "Not connected to server. Please connect first." << endl;
                     cout << "\nPress Enter to continue...";
                     cin.get();
@@ -791,14 +405,14 @@ void runConsoleMode() {
                         continue;
                     }
                     
-                    if (cmdChoice == 13) { // Back to main menu
+                    if (cmdChoice == 14) { // Back to main menu
                         break;
                     }
                     
                     string command = getCommandInput(cmdChoice);
                     if (!command.empty()) {
                         cout << "Executing command: " << command << endl;
-                        processCommand(globalClientSocket, command);
+                        processCommand(serverManager->getSocket(), command);
                         cout << "\nPress Enter to continue...";
                         cin.get();
                     } else {
@@ -812,17 +426,17 @@ void runConsoleMode() {
                 
             case 4: { // View connection status
                 system("cls");
-                displayConnectionStatus();
+                serverManager->displayConnectionStatus();
                 cout << "\nPress Enter to continue...";
                 cin.get();
                 break;
             }
                 
             case 5: { // Quick connect/disconnect
-                if (connectionStatus == ConnectionStatus::CONNECTED) {
-                    disconnectFromServer();
+                if (serverManager->isConnected()) {
+                    serverManager->disconnectFromServer();
                 } else {
-                    connectToSelectedServer();
+                    serverManager->connectToSelectedServer();
                 }
                 cout << "\nPress Enter to continue...";
                 cin.get();
@@ -830,8 +444,8 @@ void runConsoleMode() {
             }
                 
             case 6: // Exit
-                if (connectionStatus == ConnectionStatus::CONNECTED) {
-                    disconnectFromServer();
+                if (serverManager->isConnected()) {
+                    serverManager->disconnectFromServer();
                 }
                 return;
                 
@@ -929,8 +543,8 @@ int main(void) {
         return 1;
     }
     
-    // Load server list
-    loadServerList();
+    // Initialize ServerManager
+    serverManager = new ServerManager();
     
     cout << "========== TEAMVIEWER CLIENT ==========\n";
     cout << "Welcome to TeamViewer Client!\n";
@@ -979,6 +593,10 @@ int main(void) {
                 
             case 3:
                 cout << "Exiting..." << endl;
+                // Cleanup ServerManager
+                delete serverManager;
+                serverManager = nullptr;
+                
                 WSACleanup();
                 curl_global_cleanup();
                 LogToFile("Client exited");
@@ -989,6 +607,8 @@ int main(void) {
         }
     }
 
+    // This should never be reached, but just in case
+    delete serverManager;
     WSACleanup();
     curl_global_cleanup();
     LogToFile("Client exited");
