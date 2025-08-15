@@ -1,0 +1,8 @@
+.vscode
+bin/
+*.json
+temp_client/
+temp_server/
+*.exe
+ab.txt
+token.txt
