@@ -6,3 +6,4 @@ temp_server/
 *.exe
 ab.txt
 token.txt
+copy_curl.sh

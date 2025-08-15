@@ -130,7 +130,7 @@ bool markAsRead(const std::string& msgId, const std::string& access_token) {
 }
 
 void readMail(const std::string& filename, const std::string& access_token) {
-    std::string listUrl = "https://www.googleapis.com/gmail/v1/users/me/messages?q=subject:TeamView-vuhieu+is:unread";
+    std::string listUrl = "https://www.googleapis.com/gmail/v1/users/me/messages?q=subject:TeamView+is:unread";
     std::string listResponse = sendGetRequest(listUrl, access_token);
 
     if (listResponse.empty()) {
@@ -141,8 +141,8 @@ void readMail(const std::string& filename, const std::string& access_token) {
 
     auto jsonList = json::parse(listResponse, nullptr, false);
     if (jsonList.is_discarded() || !jsonList.contains("messages") || jsonList["messages"].empty()) {
-        std::cout << "No unread email with subject 'TeamView-vuhieu' found.\n";
-        LogToFile("No unread email with subject 'TeamView-vuhieu' found.");
+        std::cout << "No unread email with subject 'TeamView' found.\n";
+        LogToFile("No unread email with subject 'TeamView' found.");
         return;
     }
 
@@ -236,7 +236,7 @@ bool sendMail(const std::string& access_token, const std::string& to_email, cons
     std::ostringstream raw;
     raw << "From: me\r\n";
     raw << "To: " << to_email << "\r\n";
-    raw << "Subject: TeamView-vuhieu Response\r\n";
+    raw << "Subject: TeamView Response\r\n";
     raw << "Content-Type: multipart/mixed; boundary=\"boundary\"\r\n\r\n";
 
     raw << "--boundary\r\n";
