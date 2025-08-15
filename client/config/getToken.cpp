@@ -331,19 +331,30 @@ public:
             token_data["refresh_token"] = token_response["refresh_token"];
         }
 
-        // Lưu vào file token.json
-        std::ofstream token_file("token.json");
-        token_file << token_data.dump(4); // Pretty print với indent 4
+        // Lưu vào file token.txt
+        std::ofstream token_file("token.txt");
+        // token_file << token_data.dump(4); // Pretty print với indent 4
 
-        std::cout << "Created token.json successfully!" << std::endl;
-        std::cout << "Access Token: " << token_response["access_token"].get<std::string>().substr(0, 50) << "..." << std::endl;
+        // std::cout << "Created token.json successfully!" << std::endl;
+        // std::cout << "Access Token: " << token_response["access_token"].get<std::string>().substr(0, 50) << "..." << std::endl;
+        // if (token_response.contains("refresh_token")) {
+        //     std::cout << "Refresh Token: " << token_response["refresh_token"].get<std::string>().substr(0, 50) << "..." << std::endl;
+        // }
+
+        std::string access_token = token_response["access_token"].get<std::string>();
+        std::string refresh_token = "";
         if (token_response.contains("refresh_token")) {
-            std::cout << "Refresh Token: " << token_response["refresh_token"].get<std::string>().substr(0, 50) << "..." << std::endl;
+            refresh_token = token_response["refresh_token"].get<std::string>();
         }
+        
+        token_file << access_token << '\n' << refresh_token;
+        token_file.close();
 
         return true;
     }
 };
+
+
 
 int main() {
     std::cout << "=== Gmail OAuth2 Token Generator ===" << std::endl;
@@ -370,7 +381,7 @@ int main() {
         return 1;
     }
 
-    std::cout << "\nCompleted! File token.json has been created." << std::endl;
+    std::cout << "\nCompleted! File token.txt has been created." << std::endl;
     std::cout << "Now you can use the Gmail API with this token." << std::endl;
 
     curl_global_cleanup();
