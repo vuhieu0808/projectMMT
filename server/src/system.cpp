@@ -537,7 +537,7 @@ bool ListFiles(SOCKET clientSocket, const std::wstring& directory, const std::ws
         fullPath = convert_backslashes_to_slashes(fullPath);
 
         if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            outFile << L"[DIR]  " << name << L" -> " << fullPath << L"\n";
+            outFile << L"[FOLDER]  " << name << L" -> " << fullPath << L"\n";
         } else {
             outFile << L"[FILE] " << name << L" -> " << fullPath << L"\n";
         }
