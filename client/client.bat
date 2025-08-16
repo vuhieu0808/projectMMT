@@ -12,8 +12,8 @@ set SRC_FILES=client.cpp src\network.cpp src\utils.cpp src\email_utils.cpp src\e
 if exist "%LIB_DIR%\libcurl.dll.a" (
     echo Found libcurl.dll.a - Building dynamic executable...
     g++ -o client %SRC_FILES% ^
-        -I%INCLUDE_DIR% -I%INCLUDE_DIR%\curl -I%INCLUDE_DIR%\nlohmann -I%INCLUDE_DIR%\openssl ^
-        -L%LIB_DIR% -lcurl -lssl -lcrypto -lws2_32 -lshlwapi -lz -lcrypt32
+        -I%INCLUDE_DIR% -I%INCLUDE_DIR%\curl -I%INCLUDE_DIR%\nlohmann ^
+        -L%LIB_DIR% -lcurl -lws2_32 -lshlwapi -lz -lcrypt32
     if %ERRORLEVEL% NEQ 0 (
         echo Build failed.
         pause

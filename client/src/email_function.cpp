@@ -12,14 +12,56 @@
 #include <vector>
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
-#include <openssl/bio.h>
-#include <openssl/evp.h>
-#include <openssl/buffer.h>
+// #include <openssl/bio.h>
+// #include <openssl/evp.h>
+// #include <openssl/buffer.h>
 #include <filesystem>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
+static const std::string base64_chars =
+             "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+             "abcdefghijklmnopqrstuvwxyz"
+             "0123456789+/";
+
+// Hàm mã hóa Base64
+std::string base64_encode(const std::string &input) {
+    std::string ret;
+    int val = 0, valb = -6;
+    for (unsigned char c : input) {
+        val = (val << 8) + c;
+        valb += 8;
+        while (valb >= 0) {
+            ret.push_back(base64_chars[(val >> valb) & 0x3F]);
+            valb -= 6;
+        }
+    }
+    if (valb > -6) ret.push_back(base64_chars[((val << 8) >> (valb + 8)) & 0x3F]);
+    while (ret.size() % 4) ret.push_back('=');
+    return ret;
+}
+
+// Hàm giải mã Base64 chuẩn
+std::string base64_decode(const std::string &input) {
+    std::vector<int> T(256, -1);
+    for (int i = 0; i < 64; i++) T[base64_chars[i]] = i;
+
+    std::string out;
+    int val = 0, valb = -8;
+    for (unsigned char c : input) {
+        if (T[c] == -1) break;
+        val = (val << 6) + T[c];
+        valb += 6;
+        if (valb >= 0) {
+            out.push_back(char((val >> valb) & 0xFF));
+            valb -= 8;
+        }
+    }
+    return out;
+}
+
+// Biến thể URL-safe decode (Google API dùng)
 std::string base64_decode_url(const std::string& input) {
     std::string encoded = input;
     std::replace(encoded.begin(), encoded.end(), '-', '+');
@@ -27,40 +69,13 @@ std::string base64_decode_url(const std::string& input) {
     while (encoded.length() % 4 != 0) {
         encoded += '=';
     }
-
-    BIO* bio, *b64;
-    int decodeLen = static_cast<int>(encoded.length() * 3 / 4);
-    std::vector<char> buffer(decodeLen);
-
-    bio = BIO_new_mem_buf(encoded.c_str(), -1);
-    b64 = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-    bio = BIO_push(b64, bio);
-
-    int length = BIO_read(bio, buffer.data(), static_cast<int>(buffer.size()));
-    BIO_free_all(bio);
-
-    return std::string(buffer.data(), length);
+    return base64_decode(encoded);
 }
 
-std::string base64_encode(const std::string& input) {
-    BIO *bio, *b64;
-    BUF_MEM *bufferPtr;
-    b64 = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-    bio = BIO_new(BIO_s_mem());
-    bio = BIO_push(b64, bio);
-    BIO_write(bio, input.c_str(), input.length());
-    BIO_flush(bio);
-    BIO_get_mem_ptr(bio, &bufferPtr);
-    std::string encoded(bufferPtr->data, bufferPtr->length);
-    BIO_free_all(bio);
-    return encoded;
-}
-
+// Biến thể URL-safe encode
 std::string base64_encode_url(const std::string& input) {
     std::string encoded = base64_encode(input);
-    for (char& c : encoded) {
+    for (char &c : encoded) {
         if (c == '+') c = '-';
         else if (c == '/') c = '_';
     }
