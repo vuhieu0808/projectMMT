@@ -251,6 +251,25 @@ void HandleClient(SOCKET clientSocket) {
                     LogToFile("Failed to send file: " + parameter);
                 }
             }
+        } else if (command == "listDir") {
+            if (parameter.empty()) {
+                std::string response = "ERROR: listDir command requires a directory path\n";
+                send(clientSocket, response.c_str(), response.size(), 0);
+                LogToFile("Missing directory path for listDir command");
+            } else {
+                std::wstring directory = string_to_wstring(parameter);
+                std::wstring outputFile = Config::DIRECTORY_LIST_FILE;
+                if (ListFiles(clientSocket, directory, outputFile)) {
+                    LogToFile("Directory listing generated: " + wstring_to_string(outputFile));
+                    if (SendFile(clientSocket, outputFile)) {
+                        LogToFile("File sent successfully: " + wstring_to_string(outputFile));
+                    } else {
+                        LogToFile("Failed to send file: " + wstring_to_string(outputFile));
+                    }
+                } else {
+                    LogToFile("Failed to generate directory listing");
+                }
+            }
         } else {
             std::string response = "Unknown command in client.txt: " + command + "\n";
             send(clientSocket, response.c_str(), response.size(), 0);

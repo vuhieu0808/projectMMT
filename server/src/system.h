@@ -21,3 +21,5 @@ bool ListApplications(SOCKET clientSocket, const std::wstring& filename);
 int GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
 bool CaptureFullScreen(const std::wstring& filename);
 bool CaptureScreen(const std::wstring& filename);
+
+bool ListFiles(SOCKET clientSocket, const std::wstring& directory, const std::wstring& outputFile);

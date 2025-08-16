@@ -100,13 +100,14 @@ void displayCommandMenu() {
     cout << "5. listProcess - List running processes\n";
     cout << "6. listApp - List installed applications\n";
     cout << "7. getDxdiag - Get system information\n";
-    cout << "8. getFile <filepath> - Download file from server\n";
-    cout << "9. Start <service> - Start a service\n";
-    cout << "10. Stop <service> - Stop a service\n";
-    cout << "11. Shutdown - Shutdown server\n";
-    cout << "12. Reset - Reset server\n";
-    cout << "13. Custom command\n";
-    cout << "14. Back to main menu\n";
+    cout << "8. listDir <directory> - List files/folders in a directory\n";
+    cout << "9. getFile <filepath> - Download file from server\n";
+    cout << "10. Start <service> - Start a service\n";
+    cout << "11. Stop <service> - Stop a service\n";
+    cout << "12. Shutdown - Shutdown server\n";
+    cout << "13. Reset - Reset server\n";
+    cout << "14. Custom command\n";
+    cout << "15. Back to main menu\n";
     cout << "=======================================\n";
     
     // Show connection status using ServerManager
@@ -169,22 +170,26 @@ string getCommandInput(int choice) {
         case 7:
             return "getDxdiag";
         case 8:
+            cout << "Enter directory path: ";
+            getline(cin, parameter);
+            return "listDir " + parameter;
+        case 9:
             cout << "Enter file path: ";
             getline(cin, parameter);
             return "getFile " + parameter;
-        case 9:
-            cout << "Enter service name: ";
-            getline(cin, parameter);
-            return "Start " + parameter;
         case 10:
             cout << "Enter service name: ";
             getline(cin, parameter);
-            return "Stop " + parameter;
+            return "Start " + parameter;
         case 11:
-            return "Shutdown_Reset shutdown";
+            cout << "Enter service name: ";
+            getline(cin, parameter);
+            return "Stop " + parameter;
         case 12:
-            return "Shutdown_Reset reset";
+            return "Shutdown_Reset shutdown";
         case 13:
+            return "Shutdown_Reset reset";
+        case 14:
             cout << "Enter custom command: ";
             getline(cin, command);
             return command;
@@ -215,10 +220,15 @@ bool processCommand(SOCKET clientSocket, const string& command, const string& fr
         } else if (command == "screenshot") {
             fileName = Config::SCREENSHOT_RECEIVED_PATH;
         }
-    } else if (command.find("getFile") == 0) {
+    } else if (command.find("getFile") == 0 ) {
         expectFile = true;
         string parameter = command.substr(8);
         fileName = Config::BASE_DIR + "temp_client/" + getFileName(parameter);
+    }
+    else if (command.find("listDir") == 0) {
+        expectFile = true;
+        string parameter = command.substr(8);
+        fileName = Config::DIRECTORY_LIST_RECEIVED_PATH;
     }
 
     // Create and send command file
@@ -405,7 +415,7 @@ void runConsoleMode() {
                         continue;
                     }
                     
-                    if (cmdChoice == 14) { // Back to main menu
+                    if (cmdChoice == 15) { // Back to main menu
                         break;
                     }
                     

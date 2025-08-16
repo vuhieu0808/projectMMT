@@ -504,3 +504,50 @@ bool CaptureScreen(const std::wstring& filename) {
     GdiplusShutdown(gdiplusToken);
     return success;
 }
+
+bool ListFiles(SOCKET clientSocket, const std::wstring& directory, const std::wstring& outputFile) {
+    WIN32_FIND_DATAW findData;
+    std::wstring searchPath = directory + L"\\*";
+    HANDLE hFind = FindFirstFileW(searchPath.c_str(), &findData);
+
+    if (hFind == INVALID_HANDLE_VALUE) {
+        std::string response = "ERROR: Cannot open directory " + wstring_to_string(directory) + "\n";
+        send(clientSocket, response.c_str(), response.size(), 0);
+        LogToFile("Failed to open directory: " + wstring_to_string(directory));
+        return false;
+    }
+
+    std::wofstream outFile(wstring_to_string(outputFile));
+    outFile.imbue(std::locale(outFile.getloc(), new std::codecvt_utf8<wchar_t>()));
+
+    if (!outFile.is_open()) {
+        std::string response = "ERROR: Cannot write to " + wstring_to_string(outputFile) + "\n";
+        send(clientSocket, response.c_str(), response.size(), 0);
+        FindClose(hFind);
+        return false;
+    }
+
+    outFile << L"DANH SÁCH FILE/THƯ MỤC TRONG: " << convert_backslashes_to_slashes(directory) << L"\n\n";
+
+    do {
+        std::wstring name = findData.cFileName;
+        if (name == L"." || name == L"..") continue;
+
+        std::wstring fullPath = directory + L"\\" + name;
+        fullPath = convert_backslashes_to_slashes(fullPath);
+
+        if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            outFile << L"[DIR]  " << name << L" -> " << fullPath << L"\n";
+        } else {
+            outFile << L"[FILE] " << name << L" -> " << fullPath << L"\n";
+        }
+    } while (FindNextFileW(hFind, &findData));
+
+    FindClose(hFind);
+    outFile.close();
+
+    std::string response = "Directory listing generated: " + wstring_to_string(outputFile) + "\n";
+    send(clientSocket, response.c_str(), response.size(), 0);
+    LogToFile("Directory listing saved to " + wstring_to_string(outputFile));
+    return true;
+}

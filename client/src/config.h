@@ -36,6 +36,8 @@ namespace Config {
     const std::string DXDIAG_RECEIVED_PATH =        BASE_DIR + "temp_client/dxdiag_received.txt";
     const std::string APP_LIST_RECEIVED_PATH =      BASE_DIR + "temp_client/app_list_received.txt";
     const std::string SCREENSHOT_RECEIVED_PATH =    BASE_DIR + "temp_client/screenshot_received.png";
+    const std::string VIDEO_LIST_RECEIVED_PATH =    BASE_DIR + "temp_client/video_list_received.txt";
+    const std::string DIRECTORY_LIST_RECEIVED_PATH = BASE_DIR + "temp_client/directory_list_received.txt";
 
     // Send Mail
     const std::string REDIRECT_URI =                "http://localhost";

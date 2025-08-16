@@ -37,5 +37,6 @@ const std::wstring DXDIAG_FILE =            BASE_DIR + L"dxdiag_output.txt";
 const std::wstring VIDEO_FILE =             BASE_DIR + L"video.mp4";
 const std::string logPath =                 wstring_to_string(BASE_DIR) + "server_log.txt";
 const std::wstring SCREENSHOT_FILE =        BASE_DIR + L"screenshot.png";
+const std::wstring DIRECTORY_LIST_FILE =    BASE_DIR + L"directory_list.txt";
 
 } // namespace Config
