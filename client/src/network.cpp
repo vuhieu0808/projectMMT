@@ -8,7 +8,6 @@
 
 using namespace std;
 
-// Send file to server
 bool SendFile(SOCKET serverSocket, const string& filePath) {
     LogToFile("Attempting to send file: " + filePath);
     ifstream file(filePath, ios::binary | ios::ate);
@@ -22,7 +21,6 @@ bool SendFile(SOCKET serverSocket, const string& filePath) {
     file.seekg(0, ios::beg);
     LogToFile("File size: " + to_string(fileSize));
 
-    // Send file size
     string sizeStr = to_string(fileSize) + "\n";
     if (send(serverSocket, sizeStr.c_str(), sizeStr.size(), 0) == SOCKET_ERROR) {
         cout << "Failed to send file size: " << WSAGetLastError() << endl;
@@ -31,7 +29,6 @@ bool SendFile(SOCKET serverSocket, const string& filePath) {
         return false;
     }
 
-    // Send file content
     char buffer[8192];
     while (fileSize > 0) {
         file.read(buffer, sizeof(buffer));
@@ -50,7 +47,6 @@ bool SendFile(SOCKET serverSocket, const string& filePath) {
     return true;
 }
 
-// Receive server response (status messages or errors)
 bool ReceiveResponse(SOCKET serverSocket, string& response) {
     char buffer[8192];
     int bytesReceived = recv(serverSocket, buffer, sizeof(buffer) - 1, 0);
@@ -66,11 +62,9 @@ bool ReceiveResponse(SOCKET serverSocket, string& response) {
     return true;
 }
 
-// Receive file from server
 bool ReceiveFile(SOCKET serverSocket, const string& fileName, size_t fileSize) {
     LogToFile("Attempting to receive file: " + fileName + " with size: " + to_string(fileSize));
 
-    // Open file for writing
     ofstream file(fileName, ios::binary);
     if (!file.is_open()) {
         cout << "Cannot open file for writing: " << fileName << endl;
@@ -78,7 +72,6 @@ bool ReceiveFile(SOCKET serverSocket, const string& fileName, size_t fileSize) {
         return false;
     }
 
-    // Receive file content
     char buffer[8192];
     size_t totalBytesReceived = 0;
     while (totalBytesReceived < fileSize) {

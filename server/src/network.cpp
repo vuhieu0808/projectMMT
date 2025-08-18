@@ -206,7 +206,6 @@ void HandleClient(SOCKET clientSocket) {
                         LogToFile("Invalid duration for record: " + parameter);
                     } else {
                         LogToFile("Starting video recording for " + parameter + " seconds");
-                        // Remove old video file if it exists
                         std::remove(wstring_to_string(Config::VIDEO_FILE).c_str());
                         bool success = CaptureVideo(clientSocket, Config::VIDEO_FILE, duration);
                         if (success) {
@@ -218,7 +217,6 @@ void HandleClient(SOCKET clientSocket) {
                                 LogToFile("Failed to send video file");
                             }
                         } else {
-                            // Error messages already sent via clientSocket in CaptureVideo
                             LogToFile("Video recording failed");
                         }
                     }

@@ -15,7 +15,6 @@
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 
-// Shutdown - Reset
 bool ShutdownReset(SOCKET clientSocket, const std::string& action) {
     LogToFile("Received shutdown/reset command: " + action);
     HANDLE hToken;
@@ -70,7 +69,7 @@ bool ShutdownReset(SOCKET clientSocket, const std::string& action) {
 
 bool ListProcesses(SOCKET clientSocket, const std::wstring& filename) {
     LogToFile("Listing processes and applications");
-    std::vector<std::pair<std::wstring, DWORD>> openApplications; // Store both title and PID
+    std::vector<std::pair<std::wstring, DWORD>> openApplications;
     auto EnumWindowsProc = [](HWND hwnd, LPARAM lParam) -> BOOL {
         const DWORD TITLE_SIZE = 1024;
         WCHAR windowTitle[TITLE_SIZE];
@@ -79,7 +78,7 @@ bool ListProcesses(SOCKET clientSocket, const std::wstring& filename) {
             int length = GetWindowTextW(hwnd, windowTitle, TITLE_SIZE);
             if (length > 0) {
                 DWORD processId;
-                GetWindowThreadProcessId(hwnd, &processId); // Get PID for the window
+                GetWindowThreadProcessId(hwnd, &processId);
                 apps->push_back({windowTitle, processId});
             }
         }
@@ -109,7 +108,6 @@ bool ListProcesses(SOCKET clientSocket, const std::wstring& filename) {
         WriteFile(hFile, appInfo.c_str(), appInfo.size() * sizeof(wchar_t), &bytesWritten, NULL);
     }
 
-    // processes
     HANDLE hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hProcessSnap == INVALID_HANDLE_VALUE) {
         LogToFile("CreateToolhelp32Snapshot failed: " + std::to_string(GetLastError()));
@@ -205,13 +203,11 @@ bool KillProcess(SOCKET clientSocket, DWORD processId) {
     }
 }
 
-// List applications can open with processID
 bool ListApplications(SOCKET clientSocket, const std::wstring& filename) {
     LogToFile("Listing system applications");
     std::vector<Application> apps;
     std::set<std::wstring> uniquePaths;
 
-    // Scan system directories
     const wchar_t* systemPaths[] = {
         L"C:\\Windows\\System32",
         L"C:\\Windows",
@@ -235,7 +231,6 @@ bool ListApplications(SOCKET clientSocket, const std::wstring& filename) {
         }
     }
 
-    // Scan registry
     HKEY hKey;
     if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
         wchar_t subkeyName[MAX_PATH];
@@ -259,7 +254,6 @@ bool ListApplications(SOCKET clientSocket, const std::wstring& filename) {
         RegCloseKey(hKey);
     }
 
-    // Scan Start Menu
     wchar_t startMenuPath[MAX_PATH];
     if (SHGetSpecialFolderPathW(NULL, startMenuPath, CSIDL_COMMON_PROGRAMS, FALSE)) {
         WIN32_FIND_DATAW findData;
@@ -295,7 +289,6 @@ bool ListApplications(SOCKET clientSocket, const std::wstring& filename) {
         }
     }
 
-    // Remove duplicates and sort
     std::vector<Application> uniqueApps;
     for (const auto& app : apps) {
         if (uniquePaths.find(app.path) == uniquePaths.end()) {
@@ -306,7 +299,6 @@ bool ListApplications(SOCKET clientSocket, const std::wstring& filename) {
     std::sort(uniqueApps.begin(), uniqueApps.end(), 
         [](const Application& a, const Application& b) { return a.name < b.name; });
 
-    // Write to file
     std::wofstream outFile(wstring_to_string(filename));
     outFile.imbue(std::locale(outFile.getloc(), new std::codecvt_utf8<wchar_t>()));
     if (outFile.is_open()) {
@@ -331,9 +323,7 @@ bool ListApplications(SOCKET clientSocket, const std::wstring& filename) {
 
 using namespace Gdiplus;
 
-// Hàm lấy encoder CLSID cho PNG
-int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
-{
+int GetEncoderClsid(const WCHAR* format, CLSID* pClsid) {
     UINT num = 0;
     UINT size = 0;
 
@@ -347,10 +337,8 @@ int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
 
     GetImageEncoders(num, size, pImageCodecInfo);
 
-    for (UINT j = 0; j < num; ++j)
-    {
-        if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0)
-        {
+    for (UINT j = 0; j < num; ++j) {
+        if (wcscmp(pImageCodecInfo[j].MimeType, format) == 0) {
             *pClsid = pImageCodecInfo[j].Clsid;
             free(pImageCodecInfo);
             return j;
@@ -361,19 +349,14 @@ int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
     return -1;
 }
 
-// Hàm chụp toàn bộ màn hình (bao gồm multiple monitors)
-bool CaptureFullScreen(const std::wstring& filename)
-{
-    // Thiết lập DPI awareness để lấy độ phân giải thực tế
+bool CaptureFullScreen(const std::wstring& filename) {
     SetProcessDPIAware();
 
-    // Lấy kích thước virtual screen (bao gồm tất cả monitors)
     int x = GetSystemMetrics(SM_XVIRTUALSCREEN);
     int y = GetSystemMetrics(SM_YVIRTUALSCREEN);
     int width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
     int height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 
-    // Nếu không có virtual screen, sử dụng primary screen
     if (width == 0 || height == 0) {
         x = y = 0;
         width = GetSystemMetrics(SM_CXSCREEN);
@@ -383,7 +366,6 @@ bool CaptureFullScreen(const std::wstring& filename)
     LogToFile("Kich thuoc capture: " + std::to_string(width) + "x" + std::to_string(height) + " pixels");
     LogToFile("Vi tri bat dau: (" + std::to_string(x) + ", " + std::to_string(y) + ")");
 
-    // Tạo device contexts
     HDC hScreenDC = CreateDC("DISPLAY", NULL, NULL, NULL);
     if (!hScreenDC) {
         LogToFile("Loi: Khong the tao Screen DC!");
@@ -397,7 +379,6 @@ bool CaptureFullScreen(const std::wstring& filename)
         return false;
     }
 
-    // Tạo bitmap với kích thước thực tế
     HBITMAP hBitmap = CreateCompatibleBitmap(hScreenDC, width, height);
     if (!hBitmap) {
         LogToFile("Loi: Khong the tao Bitmap!");
@@ -408,7 +389,6 @@ bool CaptureFullScreen(const std::wstring& filename)
 
     HBITMAP hOldBitmap = (HBITMAP)SelectObject(hMemoryDC, hBitmap);
 
-    // Capture màn hình với CAPTUREBLT để bao gồm layered windows
     BOOL result = BitBlt(hMemoryDC, 0, 0, width, height, hScreenDC, x, y, SRCCOPY | CAPTUREBLT);
     
     if (!result) {
@@ -420,7 +400,6 @@ bool CaptureFullScreen(const std::wstring& filename)
         return false;
     }
 
-    // Tạo GDI+ Bitmap từ HBITMAP
     Bitmap* bitmap = Bitmap::FromHBITMAP(hBitmap, NULL);
     if (!bitmap) {
         LogToFile("Loi: Khong the tao GDI+ Bitmap!");
@@ -433,7 +412,6 @@ bool CaptureFullScreen(const std::wstring& filename)
 
     LogToFile("Kich thuoc bitmap: " + std::to_string(bitmap->GetWidth()) + "x" + std::to_string(bitmap->GetHeight()) + " pixels");
 
-    // Lấy PNG encoder
     CLSID pngClsid;
     if (GetEncoderClsid(L"image/png", &pngClsid) == -1) {
         LogToFile("Loi: Khong tim thay PNG encoder!");
@@ -445,10 +423,8 @@ bool CaptureFullScreen(const std::wstring& filename)
         return false;
     }
 
-    // Lưu file PNG
     Status status = bitmap->Save(filename.c_str(), &pngClsid, NULL);
     
-    // Dọn dẹp bộ nhớ
     delete bitmap;
     SelectObject(hMemoryDC, hOldBitmap);
     DeleteObject(hBitmap);
@@ -464,7 +440,6 @@ bool CaptureFullScreen(const std::wstring& filename)
 }
 
 bool CaptureScreen(const std::wstring& filename) {
-    // Khởi tạo GDI+
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
     Status gdiStatus = GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
@@ -474,7 +449,6 @@ bool CaptureScreen(const std::wstring& filename) {
         return false;
     }
 
-    // Hiển thị thông tin màn hình
     int primaryWidth = GetSystemMetrics(SM_CXSCREEN);
     int primaryHeight = GetSystemMetrics(SM_CYSCREEN);
     int virtualWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
@@ -488,7 +462,6 @@ bool CaptureScreen(const std::wstring& filename) {
     LogToFile("\n--- BAT DAU CHUP MAN HINH ---");
     LogToFile("Dang xu ly...");
 
-    // Thực hiện chụp màn hình
     bool success = CaptureFullScreen(filename);
 
     LogToFile("\n--- KET QUA ---");
@@ -500,7 +473,6 @@ bool CaptureScreen(const std::wstring& filename) {
         LogToFile("Thu chay voi quyen Administrator hoac kiem tra lai.");
     }
 
-    // Dọn dẹp GDI+
     GdiplusShutdown(gdiplusToken);
     return success;
 }

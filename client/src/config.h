@@ -18,12 +18,11 @@
 inline std::string GetCurrentExeDir() {
     char path[MAX_PATH];
     GetModuleFileNameA(NULL, path, MAX_PATH);
-    PathRemoveFileSpecA(path); // bỏ phần tên file exe, giữ lại thư mục
+    PathRemoveFileSpecA(path); 
     return std::string(path);
 }
 
 namespace Config {
-    // const std::string BASE_DIR = "D:/Hieu/university/1st_year/HK3/MMT/TeamViewer-vuhieu/Project/official/";
     const std::string BASE_DIR = GetCurrentExeDir() + "/";
 
     const std::string EMAIL_PY_PATH =               BASE_DIR + "client/src/email_code.py";
@@ -39,7 +38,7 @@ namespace Config {
     const std::string VIDEO_LIST_RECEIVED_PATH =    BASE_DIR + "temp_client/video_list_received.txt";
     const std::string DIRECTORY_LIST_RECEIVED_PATH = BASE_DIR + "temp_client/directory_list_received.txt";
 
-    // Send Mail
+    // Mail
     const std::string REDIRECT_URI =                "http://localhost";
     const std::string SCOPE =                       "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send";
     const std::string TOKEN_FILE =                  BASE_DIR + "config/token.txt";

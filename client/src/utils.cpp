@@ -11,7 +11,6 @@ std::string convert_backslashes_to_slashes(std::string path) {
     return path;
 }
 
-// Log to file for debugging
 void LogToFile(const string& message, const string& logPath) {
     ofstream logFile(logPath, ios_base::app);
     if (logFile.is_open()) {
@@ -23,7 +22,6 @@ void LogToFile(const string& message, const string& logPath) {
     }
 }
 
-// Create client.txt with the given command
 void CreateCommandFile(const string& command, const string& filePath) {
     ofstream file(filePath);
     if (file.is_open()) {
@@ -37,7 +35,6 @@ void CreateCommandFile(const string& command, const string& filePath) {
     }
 }
 
-// Check if string is a valid number
 bool isValidNumber(const string& str) {
     if (str.empty()) return false;
     for (char c : str) {
@@ -49,6 +46,6 @@ bool isValidNumber(const string& str) {
 std::string getFileName(const std::string& path) {
     size_t pos = path.find_last_of("/\\");
     if (pos == std::string::npos)
-        return path; // Không tìm thấy dấu '/' hoặc '\', trả nguyên chuỗi
+        return path;
     return path.substr(pos + 1);
 }

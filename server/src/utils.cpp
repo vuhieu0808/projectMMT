@@ -24,7 +24,6 @@ std::wstring convert_backslashes_to_slashes(std::wstring path) {
     return path;
 }
 
-// Log to file for debugging
 void LogToFile(const std::string& message) {
     std::ofstream logFile(Config::logPath, std::ios_base::app);
     if (logFile.is_open()) {
@@ -33,7 +32,7 @@ void LogToFile(const std::string& message) {
     }
 }
 
-std::wstring getExeDirectory() { // get current directory
+std::wstring getExeDirectory() {
     wchar_t buffer[MAX_PATH];
     GetModuleFileNameW(NULL, buffer, MAX_PATH);
     std::wstring::size_type pos = std::wstring(buffer).find_last_of(L"\\/");

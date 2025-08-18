@@ -6,7 +6,7 @@ echo Build and Run Client
 set INCLUDE_DIR=include
 set LIB_DIR=lib
 
-set SRC_FILES=client.cpp src\network.cpp src\utils.cpp src\email_utils.cpp src\email_function.cpp src\ServerManager.cpp
+set SRC_FILES=client.cpp src\network.cpp src\utils.cpp src\email_utils.cpp src\email_function.cpp
 
 :: Build dynamic executable
 if exist "%LIB_DIR%\libcurl.dll.a" (

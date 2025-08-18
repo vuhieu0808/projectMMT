@@ -19,16 +19,13 @@
 inline std::string GetCurrentExeDir() {
     char path[MAX_PATH];
     GetModuleFileNameA(NULL, path, MAX_PATH);
-    PathRemoveFileSpecA(path); // bỏ phần tên file exe, giữ lại thư mục
+    PathRemoveFileSpecA(path);
     return std::string(path);
 }
 
 namespace Config {
-// Base directory for temporary files
-// const std::wstring BASE_DIR = L"D:\\Hieu\\university\\1st_year\\HK3\\MMT\\TeamViewer-vuhieu\\Project\\official\\temp_server\\";
 const std::wstring BASE_DIR = string_to_wstring(GetCurrentExeDir()) + L"\\temp_server\\";
 
-// File paths
 const std::string CLIENT_FILE =             wstring_to_string(BASE_DIR) + "client.txt";
 const std::wstring KEYLOG_FILE =            BASE_DIR + L"keylog.txt";
 const std::wstring PROCESS_LIST_FILE =      BASE_DIR + L"listProcess.txt";

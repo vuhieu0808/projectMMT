@@ -25,7 +25,6 @@ static const std::string base64_chars =
              "abcdefghijklmnopqrstuvwxyz"
              "0123456789+/";
 
-// Hàm mã hóa Base64
 std::string base64_encode(const std::string &input) {
     std::string ret;
     int val = 0, valb = -6;
@@ -42,7 +41,6 @@ std::string base64_encode(const std::string &input) {
     return ret;
 }
 
-// Hàm giải mã Base64 chuẩn
 std::string base64_decode(const std::string &input) {
     std::vector<int> T(256, -1);
     for (int i = 0; i < 64; i++) T[base64_chars[i]] = i;
@@ -61,7 +59,6 @@ std::string base64_decode(const std::string &input) {
     return out;
 }
 
-// Biến thể URL-safe decode (Google API dùng)
 std::string base64_decode_url(const std::string& input) {
     std::string encoded = input;
     std::replace(encoded.begin(), encoded.end(), '-', '+');
@@ -72,7 +69,6 @@ std::string base64_decode_url(const std::string& input) {
     return base64_decode(encoded);
 }
 
-// Biến thể URL-safe encode
 std::string base64_encode_url(const std::string& input) {
     std::string encoded = base64_encode(input);
     for (char &c : encoded) {
