@@ -469,66 +469,31 @@ void runConsoleMode() {
 
 void runEmailMode() {
     while (true) {
-        displayEmailModeMenu();
+        cout << "Starting email monitoring..." << endl;
+        cout << "You can type 'stop' during the waiting period to exit." << endl;
+        cout << "Checking emails every 30 seconds..." << endl;
         
-        string input;
-        getline(cin, input);
-        
-        if (input.empty()) continue;
-        
-        int choice;
-        try {
-            choice = stoi(input);
-        } catch (...) {
-            cout << "Invalid option. Please try again." << endl;
-            continue;
-        }
-        
-        switch (choice) {
-            case 1: // Switch to console mode
-                return;
-                
-            case 2: { // Start email monitoring (auto mode)
-                cout << "Starting email monitoring..." << endl;
-                cout << "You can type 'stop' during the waiting period to exit." << endl;
-                cout << "Checking emails every 30 seconds..." << endl;
-                
-                bool continueMonitoring = true;
-                while (continueMonitoring) {
-                    cout << "\n--- Checking for new emails ---" << endl;
-                    processEmailCommand();
-                    
-                    // Wait for 30 seconds or user input
-                    string userInput;
-                    if (waitForInput(userInput, 30)) {
-                        if (userInput == "stop" || userInput == "STOP") {
-                            cout << "Stopping email monitoring..." << endl;
-                            continueMonitoring = false;
-                        } else {
-                            cout << "Unknown command. Type 'stop' to exit monitoring." << endl;
-                        }
-                    }
+        bool continueMonitoring = true;
+        while (continueMonitoring) {
+            cout << "\n--- Checking for new emails ---" << endl;
+            processEmailCommand();
+            
+            // Wait for 30 seconds or user input
+            string userInput;
+            if (waitForInput(userInput, 30)) {
+                if (userInput == "stop" || userInput == "STOP") {
+                    cout << "Stopping email monitoring..." << endl;
+                    continueMonitoring = false;
+                } else {
+                    cout << "Unknown command. Type 'stop' to exit monitoring." << endl;
                 }
-                
-                cout << "Email monitoring stopped. Returning to menu..." << endl;
-                cout << "\nPress Enter to continue...";
-                cin.get();
-                break;
             }
-                
-            case 3: // Check email once
-                cout << "Checking emails once..." << endl;
-                processEmailCommand();
-                cout << "\nPress Enter to continue...";
-                cin.get();
-                break;
-                
-            case 4: // Exit
-                return;
-                
-            default:
-                cout << "Invalid option. Please try again." << endl;
         }
+        
+        cout << "Email monitoring stopped. Returning to menu..." << endl;
+        cout << "\nPress Enter to continue...";
+        cin.get();
+        return;
     }
 }
 
@@ -558,63 +523,18 @@ int main(void) {
     
     cout << "========== TEAMVIEWER CLIENT ==========\n";
     cout << "Welcome to TeamViewer Client!\n";
-    cout << "You can switch between Console mode and Email mode.\n";
+    // cout << "You can switch between Console mode and Email mode.\n";
     cout << "=====================================\n";
     
     LogToFile("Client started");
     
-    ClientMode currentMode = ClientMode::CONSOLE;
+    ClientMode currentMode = ClientMode::EMAIL;
     
     while (true) {
-        system("cls");
-        cout << "\n========== MODE SELECTION ==========\n";
-        cout << "Current Mode: " << (currentMode == ClientMode::CONSOLE ? "Console" : "Email") << endl;
-        cout << "1. Console Mode - Interactive command interface\n";
-        cout << "2. Email Mode - Process commands from email\n";
-        cout << "3. Exit\n";
-        cout << "==================================\n";
-        cout << "Choose mode: ";
-        
-        string input;
-        getline(cin, input);
-        
-        if (input.empty()) continue;
-        
-        int choice;
-        try {
-            choice = stoi(input);
-        } catch (...) {
-            cout << "Invalid option. Please try again." << endl;
-            continue;
-        }
-        
-        switch (choice) {
-            case 1:
-                currentMode = ClientMode::CONSOLE;
-                cout << "\n--- Entering Console Mode ---\n";
-                runConsoleMode();
-                break;
-                
-            case 2:
-                currentMode = ClientMode::EMAIL;
-                cout << "\n--- Entering Email Mode ---\n";
-                runEmailMode();
-                break;
-                
-            case 3:
-                cout << "Exiting..." << endl;
-                // Cleanup ServerManager
-                delete serverManager;
-                serverManager = nullptr;
-                
-                WSACleanup();
-                curl_global_cleanup();
-                LogToFile("Client exited");
-                return 0;
-                
-            default:
-                cout << "Invalid option. Please try again." << endl;
-        }
+        currentMode = ClientMode::EMAIL;
+        cout << "\n--- Entering Email Mode ---\n";
+        runEmailMode();
+        break;
     }
 
     // This should never be reached, but just in case
